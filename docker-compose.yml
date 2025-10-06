@@ -1,0 +1,49 @@
+services:
+  weather_postgres:
+    image: postgres:15
+    container_name: weather_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: weatherdb
+      POSTGRES_USER: weatheruser
+      POSTGRES_PASSWORD: weatherpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/init_db.py:/app/init_db.py  # DB init script
+    networks:
+      - weather_network
+
+  weather_backend:
+    build: ./backend
+    container_name: weather_backend
+    restart: always
+    env_file:
+      - ./backend/.env
+    ports:
+      - "5000:5000"
+    depends_on:
+      - weather_postgres
+    networks:
+      - weather_network
+
+  weather_frontend:
+    build: ./frontend
+    container_name: weather_frontend
+    restart: always
+    env_file:
+      - ./frontend/.env
+    ports:
+      - "3000:80"
+    depends_on:
+      - weather_backend
+    networks:
+      - weather_network
+
+volumes:
+  pgdata:
+
+networks:
+  weather_network:
+    driver: bridge
