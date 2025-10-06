@@ -1,24 +1,36 @@
 from flask import Blueprint, request, jsonify
-from werkzeug.security import check_password_hash
-from db_config import get_db_connection
+from db import get_connection
 
-signin_bp = Blueprint('signin', __name__)
+signin_bp = Blueprint("signin", __name__)
 
-@signin_bp.route('/signin', methods=['POST'])
+@signin_bp.route("/signin", methods=["POST"])
 def signin():
-    data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        password = data.get("password")
 
-    conn = get_db_connection()
-    cur = conn.cursor()
+        # ✅ Validate input
+        if not email or not password:
+            return jsonify({"error": "Email and password are required"}), 400
 
-    cur.execute("SELECT password FROM users WHERE email = %s", (email,))
-    user = cur.fetchone()
+        conn = get_connection()
+        cur = conn.cursor()
 
-    cur.close()
-    conn.close()
+        # ✅ Check credentials
+        cur.execute(
+            "SELECT * FROM users WHERE email = %s AND password = %s",
+            (email, password)
+        )
+        user = cur.fetchone()
 
-    if user and check_password_hash(user[0], password):
-        return jsonify({"message": "Login successful"}), 200
-    return jsonify({"message": "Invalid credentials"}), 401
+        cur.close()
+        conn.close()
+
+        if not user:
+            return jsonify({"error": "Invalid email or password"}), 401
+
+        return jsonify({"message": "Login successful", "email": email}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

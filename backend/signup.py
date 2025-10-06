@@ -1,26 +1,40 @@
 from flask import Blueprint, request, jsonify
-from werkzeug.security import generate_password_hash
-from db_config import get_db_connection
+from db import get_connection
 
-signup_bp = Blueprint('signup', __name__)
+signup_bp = Blueprint("signup", __name__)
 
-@signup_bp.route('/signup', methods=['POST'])
+@signup_bp.route("/signup", methods=["POST"])
 def signup():
-    data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        password = data.get("password")
 
-    conn = get_db_connection()
-    cur = conn.cursor()
+        # ✅ Validate input
+        if not email or not password:
+            return jsonify({"error": "Email and password are required"}), 400
 
-    cur.execute("SELECT * FROM users WHERE email = %s", (email,))
-    if cur.fetchone():
-        return jsonify({"message": "Email already registered"}), 400
+        conn = get_connection()
+        cur = conn.cursor()
 
-    hashed = generate_password_hash(password)
-    cur.execute("INSERT INTO users (email, password) VALUES (%s, %s)", (email, hashed))
-    conn.commit()
+        # ✅ Check if user already exists
+        cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Email already exists"}), 409
 
-    cur.close()
-    conn.close()
-    return jsonify({"message": "Signup successful"}), 201
+        # ✅ Insert new user safely
+        cur.execute(
+            "INSERT INTO users (email, password) VALUES (%s, %s)",
+            (email, password)
+        )
+        conn.commit()
+
+        cur.close()
+        conn.close()
+
+        return jsonify({"message": "User created successfully"}), 201
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
